@@ -50,15 +50,21 @@ const fetchText = async () => {
     const response = await callVisionRequest(request);
     for (const page of response.pages) {
       for (const block of page.blocks) {
-        let value = "";
+        let blockValue = "";
         for (const paragraph of block.paragraphs) {
+          let paragraphValue = "";
           for (const word of paragraph.words) {
+            let wordValue = "";
             for (const symbol of word.symbols) {
-              value += symbol.text;
+              wordValue += symbol.text;
             }
+            //console.log("    " + wordValue);
+            paragraphValue += wordValue;
           }
+          console.log("  " + paragraphValue);
+          blockValue += paragraphValue;
         }
-        console.log(value);
+        console.log(blockValue);
       }
     }
   } catch (error: any) {
