@@ -15,6 +15,7 @@ const onUpload = (e: any) => {
   reader.onload = () => {
     const base64 = (reader.result as string).replace("\n", "");
     loadedImage.value = base64;
+    fetchText();
   }
 
   reader.readAsDataURL(file);
@@ -23,7 +24,7 @@ const onUpload = (e: any) => {
 /**
  * テキスト取得
  */
-const onFetchText = async () => {
+const fetchText = async () => {
   const request: VisionRequest = {
     requests: [
       {
@@ -35,7 +36,12 @@ const onFetchText = async () => {
             type: "TEXT_DETECTION",
             maxResults: 30,
           }
-        ]
+        ],
+        imageContext: {
+          textDetectionParams: {
+            disableTextAnnotations: true,
+          }
+        }
       },
     ]
   };
@@ -43,6 +49,19 @@ const onFetchText = async () => {
   try {
     const response = await callVisionRequest(request);
     console.log(response);
+    for (const page of response.pages) {
+      for (const block of page.blocks) {
+        let value = "";
+        for (const paragraph of block.paragraphs) {
+          for (const word of paragraph.words) {
+            for (const symbol of word.symbols) {
+              value += symbol.text;
+            }
+          }
+        }
+        console.log(value);
+      }
+    }
   } catch (error: any) {
     if (error.response) {
       console.log(error.response.data.error.message);
@@ -58,11 +77,17 @@ const onFetchText = async () => {
     :custom-upload="true"
     @uploader="onUpload"
   />
-  <div v-if="loadedImage">
-    <img :src="loadedImage" /><br />
-    <PrimeButton label="テキスト取得" @click="onFetchText" />
+  <div class="root">
+    <div v-if="loadedImage">
+      <img class="image" :src="loadedImage" />
+    </div>
   </div>
 </template>
 
 <style lang="sass" scoped>
+.root
+  position: relative
+
+  .image
+    position: absolute
 </style>
