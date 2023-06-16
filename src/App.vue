@@ -48,7 +48,6 @@ const fetchText = async () => {
 
   try {
     const response = await callVisionRequest(request);
-    console.log(response);
     for (const page of response.pages) {
       for (const block of page.blocks) {
         let value = "";
