@@ -2,8 +2,10 @@
 import FileUpload from "primevue/fileupload";
 import { ref } from "vue";
 import { type VisionRequest, callVisionRequest } from "./GoogleCloud/vision";
+import type { ContentBlock, ContentParagraph } from "./interfaces/Content";
 
 const loadedImage = ref("");
+const blocks = ref<ContentBlock[]>([]);
 
 /**
  * アップロードした
@@ -50,21 +52,22 @@ const fetchText = async () => {
     const response = await callVisionRequest(request);
     for (const page of response.pages) {
       for (const block of page.blocks) {
-        let blockValue = "";
+        const blockValue: ContentBlock = { paragraphs: [] };
         for (const paragraph of block.paragraphs) {
-          let paragraphValue = "";
+          let paragraphValue: ContentParagraph = {
+            text: "",
+            boundingBox: { vertices: paragraph.boundingBox.vertices },
+          };
           for (const word of paragraph.words) {
             let wordValue = "";
             for (const symbol of word.symbols) {
               wordValue += symbol.text;
             }
-            //console.log("    " + wordValue);
-            paragraphValue += wordValue;
+            paragraphValue.text += wordValue;
           }
-          console.log("  " + paragraphValue);
-          blockValue += paragraphValue;
+          blockValue.paragraphs.push(paragraphValue);
         }
-        console.log(blockValue);
+        blocks.value.push(blockValue);
       }
     }
   } catch (error: any) {
@@ -72,6 +75,15 @@ const fetchText = async () => {
       console.log(error.response.data.error.message);
     }
   }
+}
+
+/**
+ * ブロックの読み上げ
+ * @param block 読み上げるブロック
+ */
+const onSpeechBlock = (block: ContentBlock): void => {
+  const text = block.paragraphs.reduce((t, p) => t += p.text, "");
+  alert(text);
 }
 </script>
 
@@ -85,6 +97,24 @@ const fetchText = async () => {
   <div class="root">
     <div v-if="loadedImage">
       <img class="image" :src="loadedImage" />
+      <template v-for="(block, blockIndex) in blocks" :key="blockIndex">
+        <template
+          v-for="(paragraph, paragraphIndex) in block.paragraphs"
+          :key="paragraphIndex"
+        >
+          <div
+            class="textArea"
+            @click="onSpeechBlock(block)"
+            :style="{
+              left: `${paragraph.boundingBox.vertices[0].x}px`,
+              top: `${paragraph.boundingBox.vertices[0].y}px`,
+              width: `${paragraph.boundingBox.vertices[2].x - paragraph.boundingBox.vertices[0].x}px`,
+              height: `${paragraph.boundingBox.vertices[2].y - paragraph.boundingBox.vertices[0].y}px`,
+            }"
+          >
+          </div>
+        </template>
+      </template>
     </div>
   </div>
 </template>
@@ -95,4 +125,15 @@ const fetchText = async () => {
 
   .image
     position: absolute
+
+  .textArea
+    position: absolute
+    background: #FF00FF
+    animation: flash 2s linear infinite
+
+    @keyframes flash
+      0%, 100%
+        opacity: 0.4
+      50%
+        opacity: 0
 </style>
