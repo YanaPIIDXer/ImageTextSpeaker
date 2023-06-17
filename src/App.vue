@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import FileUpload from "primevue/fileupload";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import { type VisionRequest, callVisionRequest } from "./GoogleCloud/vision";
 import type { ContentBlock, ContentParagraph } from "./interfaces/Content";
+import { type SpeechRequest, callSpeechRequest } from "./GoogleCloud/speech";
+
+interface Content {
+  block: ContentBlock;
+  voice: string;
+}
 
 const loadedImage = ref("");
-const blocks = ref<ContentBlock[]>([]);
+const contents = ref<Content[]>([]);
+
+const currentVoice = ref("");
+const audioRef = ref<HTMLAudioElement | null>();
 
 /**
  * アップロードした
@@ -67,7 +76,29 @@ const fetchText = async () => {
           }
           blockValue.paragraphs.push(paragraphValue);
         }
-        blocks.value.push(blockValue);
+        let voice = "";
+        try {
+          const speechRequest: SpeechRequest = {
+            input: {
+              text: blockValue.paragraphs.reduce((t, p) => t += p.text, ""),
+            },
+            voice: {
+              languageCode: "ja-JP",
+              name: "ja-JP-Neural2-B",
+              ssmlGender: "FEMALE",
+            },
+            audioConfig: {
+              audioEncoding: "MP3",
+            }
+          }
+          voice = await callSpeechRequest(speechRequest);
+        } catch (error) {
+          console.error(error);
+        }
+        contents.value.push({
+          block: blockValue,
+          voice,
+        });
       }
     }
   } catch (error: any) {
@@ -78,12 +109,19 @@ const fetchText = async () => {
 }
 
 /**
- * ブロックの読み上げ
- * @param block 読み上げるブロック
+ * コンテンツの読み上げ
+ * @param block 読み上げるコンテンツ
  */
-const onSpeechBlock = (block: ContentBlock): void => {
-  const text = block.paragraphs.reduce((t, p) => t += p.text, "");
-  alert(text);
+const onSpeechBlock = async (content: Content): Promise<void> => {
+  if (!audioRef.value) { return; }
+
+  audioRef.value.pause();
+  currentVoice.value = content.voice;
+  nextTick(() => {
+    if (!audioRef.value) { return; }
+    audioRef.value.currentTime = 0;
+    audioRef.value.play();
+  })
 }
 </script>
 
@@ -97,14 +135,14 @@ const onSpeechBlock = (block: ContentBlock): void => {
   <div class="root">
     <div v-if="loadedImage">
       <img class="image" :src="loadedImage" />
-      <template v-for="(block, blockIndex) in blocks" :key="blockIndex">
+      <template v-for="(content, contentIndex) in contents" :key="contentIndex">
         <template
-          v-for="(paragraph, paragraphIndex) in block.paragraphs"
+          v-for="(paragraph, paragraphIndex) in content.block.paragraphs"
           :key="paragraphIndex"
         >
           <div
             class="textArea"
-            @click="onSpeechBlock(block)"
+            @click="onSpeechBlock(content)"
             :style="{
               left: `${paragraph.boundingBox.vertices[0].x}px`,
               top: `${paragraph.boundingBox.vertices[0].y}px`,
@@ -116,6 +154,7 @@ const onSpeechBlock = (block: ContentBlock): void => {
         </template>
       </template>
     </div>
+    <audio :src="currentVoice" ref="audioRef" />
   </div>
 </template>
 
